@@ -1,0 +1,37 @@
+
+instantConfig is a library providing the ability to describe the scheme of a configuration segment for a class, instantiate a loader for a specific format following that description, and access to the statically-typed verified content of that loaded configuration.
+
+Example :
+~~~
+
+// The configuration must contain an AppName string and a NameList list of strings
+
+auto myConfigDef = 
+config(
+  setting(STG_NAME("AppName"), string, length>=5),
+  setting(STG_NAME("NameList"), list(string))
+);
+
+//create the loader for a specific file format
+Backend loader;
+
+//load the configuration using the loader
+auto cfg = myConfigDef.load(loader);
+
+if (cfg.hasError()){
+  std::cout<<"Errors:"<<std::endl;
+  for(auto& error : cfg.getErrors()){
+    std::cout<<err.getFailingSettingName()<<" : "<<err.what()<<std::endl;
+  }
+} else {
+  std::cout<<"no error while loading configuration"<<std::endl;
+}
+
+//the access to the setting "AppName" brings a std::string typed result
+std::cout<<"AppName : "<<cfg.getValue(STG_NAME("AppName"))<<std::endl;
+
+//whereas the access to "NameList" brings a std::vector<std::string> result
+std::cout<<"NameList : ";
+for (auto& name : cfg.getValue(STG_NAME("NameList"))){
+  std::cout<<name<<',';
+}

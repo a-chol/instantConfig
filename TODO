@@ -1,0 +1,9 @@
+TODO
+====
+
+The following features are to be expected in a foreseeable futur:
+
+ * Full test suite for both dynamic errors and static errors
+ * A complete set of constraints against which loaded settings can be checked
+ * Loaders for json, xml, libconfig and ini files (and others depending on demands)
+ * an embedded loader for a simple configuration format
