@@ -1,3 +1,26 @@
+/*
+The MIT License (MIT)
+
+Copyright (c) 2014 a-chol
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
 
 #include <cstdint>
 #include <cstddef>
@@ -39,14 +62,29 @@ namespace icfg{
     struct sectionDef;
     template <typename... Params>
     struct mapDef;
-    template <typename SettingName, typename... Params>
+    template <typename... Params>
     struct switchDef;
     template <typename... Params>
     struct caseDef;
 
     template <typename... Params>
+    configDef<Params...> make_configDef(const std::tuple<Params...>& params){
+      return configDef<Params...>(params);
+    }
+    
+    template <typename... Params>
     sectionDef<Params...> make_sectionDef(const std::tuple<Params...>& params){
       return sectionDef<Params...>(params);
+    }
+    
+    template <typename... Params>
+    switchDef<Params...> make_switchDef(const std::tuple<Params...>& params){
+      return switchDef<Params...>(params);
+    }
+    
+    template <typename... Params>
+    caseDef<Params...> make_caseDef(const std::tuple<Params...>& params){
+      return caseDef<Params...>(params);
     }
 
     template <typename Name, typename type>
@@ -114,7 +152,7 @@ namespace icfg{
   }
   
   template <typename... Params>
-  internal::configDef<Params...> config(Params... params);
+  auto config(Params... params) -> decltype(internal::make_configDef(std::tuple_cat(internal::tuplifyOne(params)...)));
 
   template <typename... Params>
   internal::settingDef<Params...> setting(Params... params);
@@ -125,11 +163,11 @@ namespace icfg{
   template <typename... Params>
   internal::mapDef<Params...> map(Params... params);
 
-  template <uint64_t Q1, uint64_t Q2, uint64_t Q3, uint64_t Q4, typename... Params>
-  internal::switchDef<internal::settingName<Q1,Q2,Q3,Q4>,Params...> switchOn(internal::settingName<Q1,Q2,Q3,Q4>, Params... params);
+  template <typename... Params>
+  auto switchOn(Params... params) -> decltype(internal::make_switchDef(std::tuple_cat(internal::tuplifyOne(params)...)));
 
   template <typename... Params>
-  internal::caseDef<Params...> caseOf(Params... params);
+  auto caseOf(Params... params) -> decltype(internal::make_caseDef(std::tuple_cat(internal::tuplifyOne(params)...)));
 
   template <typename... Params>
   std::tuple<Params...> include(const internal::configDef<Params...>& param);
@@ -145,7 +183,7 @@ namespace icfg{
     
     template <uint64_t Q1,uint64_t Q2,uint64_t Q3,uint64_t Q4>
     struct settingName{
-      constexpr settingName(const char*){}
+      settingName(const char*){}
       
       settingName(){}
       
@@ -239,6 +277,17 @@ namespace icfg{
     template<class T>
     struct listTag{};//-> std::vector
     
+    struct int8Tag {};
+    struct uint8Tag {};
+    struct int16Tag {};
+    struct uint16Tag {};
+    struct int32Tag {};
+    struct uint32Tag {};
+    struct int64Tag {};
+    struct uint64Tag {};
+    struct floatTag{};
+    struct doubleTag{};
+    
     struct optionalTag{};
     
     struct requiredTag{};
@@ -246,6 +295,16 @@ namespace icfg{
 
   }
   extern internal::stringTag string;
+  extern internal::int8Tag int8;
+  extern internal::uint8Tag uint8;
+  extern internal::int16Tag int16;
+  extern internal::uint16Tag uint16;
+  extern internal::int32Tag int32;
+  extern internal::uint32Tag uint32;
+  extern internal::int64Tag int64;
+  extern internal::uint64Tag uint64;
+  extern internal::floatTag float32;
+  extern internal::doubleTag float64;
 
   template <typename T>
   internal::listTag<T> list(T){}
@@ -474,7 +533,7 @@ namespace icfg{
       std::tuple<Params...> content;
 
     public:
-      configDef(std::tuple<Params...> params)
+      configDef(const std::tuple<Params...>& params)
       : content(params){
       
       }
@@ -602,6 +661,13 @@ namespace icfg{
       typedef typename ExtractCaseDefFromName<Name, Params...>::result result;
       static const int index=ExtractCaseDefFromName<Name, Params...>::index+1;
     };
+    
+    //not-matching name iteration
+    template <typename Name, typename Param1, typename... Params>
+    struct ExtractCaseDefFromName<Name, Param1, Params...>{
+      typedef typename ExtractCaseDefFromName<Name, Params...>::result result;
+      static const int index=ExtractCaseDefFromName<Name, Params...>::index+1;
+    };
 
     //not-matching name terminal
     template <typename Name, typename Name1, typename... CaseParams>
@@ -610,12 +676,12 @@ namespace icfg{
       static const int index=0;
     };
 
-    template <typename SettingName, typename... Params>
+    template <typename... Params>
     struct switchDef{
       template <typename ConfigBackend>
       friend struct ConfigValueLoader_t;
         
-      typedef typename MakeSwitchResult<SettingName, Params...>::type result_type;
+      typedef typename MakeSwitchResult<Params...>::type result_type;
       
     private:
       std::tuple<Params...> content;
@@ -662,23 +728,327 @@ namespace icfg{
     };
     
   }
+  
+/*****************************************************
+  Function parameters validation
+******************************************************/
+
+  namespace internal{
+  
+    //sumup binary results of type checks after unpacking of parameters packs
+    template <bool... Conds>
+    struct all_true;
+    
+    template <bool FirstCond, bool... NextConds>
+    struct all_true<FirstCond, NextConds...>{
+      static const bool value = (FirstCond ? all_true<NextConds...>::value : false);
+    };
+
+    template <bool Value>
+    struct all_true<Value>{
+      static const bool value = Value;
+    };
+    
+    template <>
+    struct all_true<>{
+      static const bool value = true;
+    };
+
+    template <bool... Conds>
+    struct one_true;
+    
+    template <bool FirstCond, bool... NextConds>
+    struct one_true<FirstCond, NextConds...>{
+      static const bool value = (FirstCond ? true : one_true<NextConds...>::value);
+    };
+
+    template <bool Value>
+    struct one_true<Value>{
+      static const bool value = Value;
+    };
+    
+    template <>
+    struct one_true<>{
+      static const bool value = false;
+    };
+
+    //value=true if more than on of the Conds are true
+    template <bool... Conds>
+    struct more_than_one_true;
+    
+    template <bool FirstCond, bool... NextConds>
+    struct more_than_one_true<FirstCond, NextConds...>{
+      static const bool value = (FirstCond ? one_true<NextConds...>::value : more_than_one_true<NextConds...>::value);
+    };
+
+    template <bool Value>
+    struct more_than_one_true<Value>{
+      static const bool value = false;
+    };
+    
+    template <>
+    struct more_than_one_true<>{
+      static const bool value = false;
+    };
+    
+    //function for checking each parameter
+    //determine whether Operand is the same type as one of the Refs
+    template <typename Operand, typename... Refs>
+    struct is_one_of{
+    };
+
+    template <typename FirstRef, typename... Refs, typename Operand>
+    struct is_one_of<Operand, FirstRef, Refs...>{
+      static const bool value = is_one_of<Operand, Refs...>::value;
+    };
+
+    template <typename FirstRef, typename... Refs>
+    struct is_one_of<FirstRef, FirstRef, Refs...>{
+      static const bool value = true;
+    };
+
+    template <typename Operand>
+    struct is_one_of<Operand>{
+      static const bool value = false;
+    };
+
+    //determine whether Operand is an instance of one of the class-templates Refs
+    template <typename Operand, template <typename...> class... Refs>
+    struct is_one_instance_of{
+    };
+
+    template <typename Operand, template <typename...> class FirstRef, template <typename...> class... Refs>
+    struct is_one_instance_of<Operand, FirstRef, Refs...>{
+      static const bool value = is_one_instance_of<Operand, Refs...>::value;
+    };
+
+    template <typename... OperandParam, template <typename...> class FirstRef, template <typename...> class... Refs>
+    struct is_one_instance_of<FirstRef<OperandParam...>, FirstRef, Refs...>{
+      static const bool value = true;
+    };
+
+    template <typename Operand>
+    struct is_one_instance_of<Operand>{
+      static const bool value = false;
+    };
+    
+    template <typename RefParamT, typename Operand, template <RefParamT...> class... Refs>
+    struct is_one_instance_of2{
+    };
+
+    template <typename RefParamT, typename Operand, template <RefParamT...> class FirstRef, template <RefParamT...> class... Refs>
+    struct is_one_instance_of2<RefParamT, Operand, FirstRef, Refs...>{
+      static const bool value = is_one_instance_of2<RefParamT, Operand, Refs...>::value;
+    };
+
+    template <typename RefParamT, RefParamT... OperandParam, template <RefParamT...> class FirstRef, template <RefParamT...> class... Refs>
+    struct is_one_instance_of2<RefParamT, FirstRef<OperandParam...>, FirstRef, Refs...>{
+      static const bool value = true;
+    };
+
+    template <typename RefParamT, typename Operand>
+    struct is_one_instance_of2<RefParamT, Operand>{
+      static const bool value = false;
+    };
+    
+    //define overloads to pick both template types and non-template types using one function
+    template < template <typename...> class Ref, typename Operand>
+    is_one_instance_of<Operand, Ref> is_one_or_instance_of(Operand);
+
+    template < typename Ref, typename Operand>
+    is_one_of<Operand, Ref> is_one_or_instance_of(Operand);
+    
+    template < template <uint64_t,uint64_t,uint64_t,uint64_t> class Ref, typename Operand>
+    is_one_instance_of2<uint64_t, Operand, Ref> is_one_or_instance_of(Operand);
+    
+    //macros for fancier formatting of constraints inside the function definitions
+    #define CHECK_FORBIDDEN(CONTEXT, TYPE_DESC, TYPE, PARAMS) \
+      static_assert(!internal::one_true<decltype(internal::is_one_or_instance_of<TYPE>(std::declval<PARAMS>()))::value...>::value, "Forbidden "#TYPE_DESC" parameter to "#CONTEXT" function.")
+
+    #define CHECK_REQUIRED(CONTEXT, TYPE_DESC, TYPE, PARAMS) \
+      static_assert(internal::one_true<decltype(internal::is_one_or_instance_of<TYPE>(std::declval<PARAMS>()))::value...>::value, "missing required parameter "#TYPE_DESC" in "#CONTEXT)
+
+    #define CHECK_UNIQUE(CONTEXT, TYPE_DESC, TYPE, PARAMS) \
+      static_assert(!internal::more_than_one_true<decltype(internal::is_one_or_instance_of<TYPE>(std::declval<PARAMS>()))::value...>::value, "parameter "#TYPE_DESC" should be unique for "#CONTEXT)
+      
+    #define CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ) \
+      decltype(internal::is_one_or_instance_of<P1>(std::declval<PARAMS>()))::value
+      
+    #define CHECK_ALLOWED_UNROLL_PARAM_2( P1, P2, PARAMS ) \
+      CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ), \
+      CHECK_ALLOWED_UNROLL_PARAM_1( P2, PARAMS )
+      
+    #define CHECK_ALLOWED_UNROLL_PARAM_3( P1, P2, P3, PARAMS ) \
+      CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ), \
+      CHECK_ALLOWED_UNROLL_PARAM_2( P2, P3, PARAMS )
+
+    #define CHECK_ALLOWED_UNROLL_PARAM_4( P1, P2, P3, P4, PARAMS ) \
+      CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ), \
+      CHECK_ALLOWED_UNROLL_PARAM_3( P2, P3, P4, PARAMS )
+
+    #define CHECK_ALLOWED_UNROLL_PARAM_5( P1, P2, P3, P4, P5, PARAMS ) \
+      CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ), \
+      CHECK_ALLOWED_UNROLL_PARAM_4( P2, P3, P4, P5, PARAMS )
+
+    #define CHECK_ALLOWED_UNROLL_PARAM_6( P1, P2, P3, P4, P5, P6, PARAMS ) \
+      CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ), \
+      CHECK_ALLOWED_UNROLL_PARAM_5( P2, P3, P4, P5, P6, PARAMS )
+
+    #define CHECK_ALLOWED_UNROLL_PARAM_7( P1, P2, P3, P4, P5, P6, P7, PARAMS ) \
+      CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ), \
+      CHECK_ALLOWED_UNROLL_PARAM_6( P2, P3, P4, P5, P6, P7, PARAMS )
+      
+    #define CHECK_ALLOWED_UNROLL_PARAM_8( P1, P2, P3, P4, P5, P6, P7, P8, PARAMS ) \
+      CHECK_ALLOWED_UNROLL_PARAM_4( P1, P2, P3, P4, PARAMS ), \
+      CHECK_ALLOWED_UNROLL_PARAM_4( P5, P6, P7, P8, PARAMS )
+      
+    #define CHECK_ALLOWED_UNROLL_PARAM_9( P1, P2, P3, P4, P5, P6, P7, P8, P9, PARAMS ) \
+      CHECK_ALLOWED_UNROLL_PARAM_4( P1, P2, P3, P4, PARAMS ), \
+      CHECK_ALLOWED_UNROLL_PARAM_5( P5, P6, P7, P8, P9, PARAMS )
+      
+    #define CHECK_ALLOWED_UNROLL_PARAM_10( P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, PARAMS ) \
+      CHECK_ALLOWED_UNROLL_PARAM_5( P1, P2, P3, P4, P5, PARAMS ), \
+      CHECK_ALLOWED_UNROLL_PARAM_5( P6, P7, P8, P9, P10, PARAMS )
+      
+    #define CHECK_ALLOWED_UNROLL_PARAM_11( P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, PARAMS ) \
+      CHECK_ALLOWED_UNROLL_PARAM_5( P1, P2, P3, P4, P5, PARAMS ), \
+      CHECK_ALLOWED_UNROLL_PARAM_6( P6, P7, P8, P9, P10, P11, PARAMS )
+    
+    #define CHECK_ALLOWED_UNROLL_PARAM_12( P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, PARAMS ) \
+      CHECK_ALLOWED_UNROLL_PARAM_6( P1, P2, P3, P4, P5, P12, PARAMS ), \
+      CHECK_ALLOWED_UNROLL_PARAM_6( P6, P7, P8, P9, P10, P11, PARAMS )
+      
+    #define CHECK_ALLOWED_UNROLL_PARAM_13( P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, PARAMS ) \
+      CHECK_ALLOWED_UNROLL_PARAM_7( P1, P2, P3, P4, P5, P12, P13, PARAMS ), \
+      CHECK_ALLOWED_UNROLL_PARAM_6( P6, P7, P8, P9, P10, P11, PARAMS )
+      
+    #define CHECK_ALLOWED_UNROLL_PARAM_14( P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, PARAMS ) \
+      CHECK_ALLOWED_UNROLL_PARAM_7( P1, P2, P3, P4, P5, P12, P13, PARAMS ), \
+      CHECK_ALLOWED_UNROLL_PARAM_7( P6, P7, P8, P9, P10, P11, P14, PARAMS )
+      
+    #define CHECK_ALLOWED(N, CONTEXT, PARAMS, ...)                  \
+      static_assert(                                                \
+        internal::all_true<                                                   \
+          internal::one_true<                                                 \
+            CHECK_ALLOWED_UNROLL_PARAM_ ##N ( __VA_ARGS__, PARAMS)  \
+          >::value...                                               \
+        >::value,                                                   \
+        "found parameter not allowed in "#CONTEXT)
+        
+    #define CHECK_NTH(N, CONTEXT, REQUIRED, PARAMS) \
+      static_assert( \
+      decltype(internal::is_one_or_instance_of<REQUIRED>(std::declval<typename std::tuple_element<N,std::tuple<PARAMS...>>::type>()))::value, \
+      "parameter "#N" to "#CONTEXT" should be "#REQUIRED)
+  }
+  
 /*****************************************************
     Setting creation functions
 ******************************************************/
   
   template <typename... Params>
-  internal::configDef<Params...> config(Params... params){
-    return internal::configDef<Params...>(std::tuple_cat(internal::tuplifyOne(params)...));
+  auto config(Params... params) -> decltype(internal::make_configDef(std::tuple_cat(internal::tuplifyOne(params)...))){
+
+    using namespace internal;
+    CHECK_FORBIDDEN(config, caseOf, caseDef, Params);
+    CHECK_FORBIDDEN(config, list, listTag, Params);
+    CHECK_FORBIDDEN(config, string, stringTag, Params);
+    CHECK_FORBIDDEN(config, settingName, settingName, Params);
+    CHECK_FORBIDDEN(config, length constraint, LengthConstraint, Params);
+    
+    CHECK_ALLOWED(6, config, Params, settingDef, switchDef, sectionDef, std::tuple, configDef, mapDef);
+    
+    return internal::make_configDef(std::tuple_cat(internal::tuplifyOne(params)...));
   }
 
   template <typename... Params>
   internal::settingDef<Params...> setting(Params... params){
+  
+    using namespace internal;
+    CHECK_FORBIDDEN(setting, caseOf, caseDef, Params);
+    CHECK_FORBIDDEN(setting, switchOn, switchDef, Params);
+    CHECK_FORBIDDEN(setting, config, configDef, Params);
+    CHECK_FORBIDDEN(setting, include, std::tuple, Params);
+    CHECK_FORBIDDEN(setting, map, mapDef, Params);
+    CHECK_FORBIDDEN(setting, setting, settingDef, Params);
+    CHECK_FORBIDDEN(setting, section, sectionDef, Params);
+    
+    CHECK_ALLOWED( 14, setting, Params, settingName, listTag, stringTag, LengthConstraint, int8Tag, uint8Tag, int16Tag, uint16Tag, int32Tag, uint32Tag, int64Tag, uint64Tag, floatTag, doubleTag);
+    
+    CHECK_REQUIRED(setting, settingName, settingName, Params);
+    CHECK_UNIQUE(setting, settingName, settingName, Params);
+    
+    #define ICFG_IS(TYPE) decltype(internal::is_one_or_instance_of<TYPE>(std::declval<Params>()))::value...
+    
+    static_assert(
+      internal::one_true<
+        ICFG_IS(stringTag),
+        ICFG_IS(listTag),
+        ICFG_IS(int8Tag),
+        ICFG_IS(uint8Tag),
+        ICFG_IS(int16Tag),
+        ICFG_IS(uint16Tag),
+        ICFG_IS(int32Tag),
+        ICFG_IS(uint32Tag),
+        ICFG_IS(int64Tag),
+        ICFG_IS(uint64Tag),
+        ICFG_IS(floatTag),
+        ICFG_IS(doubleTag)
+      >::value, "missing required type parameter in setting definition");
+      
+    static_assert(
+      !internal::more_than_one_true<
+        ICFG_IS(stringTag),
+        ICFG_IS(listTag),
+        ICFG_IS(int8Tag),
+        ICFG_IS(uint8Tag),
+        ICFG_IS(int16Tag),
+        ICFG_IS(uint16Tag),
+        ICFG_IS(int32Tag),
+        ICFG_IS(uint32Tag),
+        ICFG_IS(int64Tag),
+        ICFG_IS(uint64Tag),
+        ICFG_IS(floatTag),
+        ICFG_IS(doubleTag)
+      >::value, "type parameter should be unique for setting definition");
+      
+    static_assert(
+      internal::one_true<
+        ICFG_IS(int8Tag),
+        ICFG_IS(uint8Tag),
+        ICFG_IS(int16Tag),
+        ICFG_IS(uint16Tag),
+        ICFG_IS(int32Tag),
+        ICFG_IS(uint32Tag),
+        ICFG_IS(int64Tag),
+        ICFG_IS(uint64Tag),
+        ICFG_IS(floatTag),
+        ICFG_IS(doubleTag)
+      >::value ? 
+      !internal::one_true<
+        decltype(internal::is_one_or_instance_of<LengthConstraint>(std::declval<Params>()))::value...
+      >::value : true,
+      "length is not a valid constraint for numbers setting type."
+    );
+    
+    #undef ICFG_IS
+    
     return internal::settingDef<Params...>(std::tuple_cat(internal::tuplifyOne(params)...));
-    //return settingDef<Params...>(std::tuple_cat(tuplifyOne(params)...));
   }
 
   template <typename... Params>
   auto section(Params... params) -> decltype(internal::make_sectionDef(std::tuple_cat(internal::tuplifyOne(params)...))){
+    
+    using namespace internal;
+    CHECK_FORBIDDEN(section, caseOf, caseDef, Params);
+    CHECK_FORBIDDEN(section, list, listTag, Params);
+    CHECK_FORBIDDEN(section, string, stringTag, Params);
+    CHECK_FORBIDDEN(section, length constraint, LengthConstraint, Params);
+    
+    CHECK_ALLOWED(6, section, Params, settingName, switchDef, settingDef, std::tuple, mapDef, sectionDef);
+    
+    CHECK_REQUIRED(section, settingName, settingName, Params);
+    CHECK_UNIQUE(section, settingName, settingName, Params);
+    
     return internal::make_sectionDef(std::tuple_cat(internal::tuplifyOne(params)...));
   }
 
@@ -687,14 +1057,45 @@ namespace icfg{
     return internal::mapDef<Params...>(std::tuple_cat(internal::tuplifyOne(params)...));
   }
 
-  template <uint64_t Q1, uint64_t Q2, uint64_t Q3, uint64_t Q4, typename... Params>
-  internal::switchDef<internal::settingName<Q1,Q2,Q3,Q4>,Params...> switchOn(internal::settingName<Q1,Q2,Q3,Q4>, Params... params){
-    return internal::switchDef<internal::settingName<Q1,Q2,Q3,Q4>,Params...>(std::tuple_cat(internal::tuplifyOne(params)...));
+  template <typename... Params>
+  auto switchOn(Params... params) -> decltype(internal::make_switchDef(std::tuple_cat(internal::tuplifyOne(params)...))){
+    
+    using namespace internal;
+    CHECK_FORBIDDEN(switchOn, setting, settingDef, Params);
+    CHECK_FORBIDDEN(switchOn, section, sectionDef, Params);
+    CHECK_FORBIDDEN(switchOn, switchOn, switchDef, Params);
+    CHECK_FORBIDDEN(switchOn, map, mapDef, Params);
+    CHECK_FORBIDDEN(switchOn, list, listTag, Params);
+    CHECK_FORBIDDEN(switchOn, string, stringTag, Params);
+    CHECK_FORBIDDEN(switchOn, config, configDef, Params);
+    CHECK_FORBIDDEN(switchOn, length constraint, LengthConstraint, Params);
+    
+    CHECK_ALLOWED(2, switchOn, Params, caseDef, settingName);
+    
+    CHECK_REQUIRED(switchOn, settingName, settingName, Params);
+    CHECK_UNIQUE(switchOn, settingName, settingName, Params);
+    CHECK_NTH(0, switchOn, settingName, Params);
+    
+    return internal::make_switchDef(std::tuple_cat(internal::tuplifyOne(params)...));
   }
 
   template <typename... Params>
-  internal::caseDef<Params...> caseOf(Params... params){
-    return internal::caseDef<Params...>(std::tuple_cat(internal::tuplifyOne(params)...));
+  auto caseOf(Params... params) -> decltype(internal::make_caseDef(std::tuple_cat(internal::tuplifyOne(params)...))){
+    
+    using namespace internal;
+    CHECK_FORBIDDEN(caseOf, caseOf, caseDef, Params);
+    CHECK_FORBIDDEN(caseOf, list, listTag, Params);
+    CHECK_FORBIDDEN(caseOf, string, stringTag, Params);
+    CHECK_FORBIDDEN(caseOf, config, configDef, Params);
+    CHECK_FORBIDDEN(caseOf, length constraint, LengthConstraint, Params);
+    
+    CHECK_ALLOWED(6, caseOf, Params, settingName, switchDef, settingDef, std::tuple, mapDef, sectionDef);
+    
+    CHECK_REQUIRED(caseOf, settingName, settingName, Params);
+    CHECK_UNIQUE(caseOf, settingName, settingName, Params);
+    CHECK_NTH(0, caseOf, settingName, Params);
+    
+    return internal::make_caseDef(std::tuple_cat(internal::tuplifyOne(params)...));
   }
 
   //include() configDef<...>
@@ -757,7 +1158,7 @@ namespace icfg{
     ExtractSettingName : retrieve the setting name
     off the parameter pack
 ******************************************************/
-
+    
     template <typename Param1, typename... Params>
     struct ExtractSettingName<Param1,Params...>{
       typedef typename ExtractSettingName<Params...>::result result;
@@ -767,9 +1168,14 @@ namespace icfg{
     struct ExtractSettingName<settingName<Q1,Q2,Q3,Q4>, Params...>{
       typedef settingName<Q1,Q2,Q3,Q4> result;
     };
-
-    template <typename Param1>
-    struct ExtractSettingName<Param1>{
+    
+    template <uint64_t Q1, uint64_t Q2, uint64_t Q3, uint64_t Q4>
+    struct ExtractSettingName<settingName<Q1,Q2,Q3,Q4>>{
+      typedef settingName<Q1,Q2,Q3,Q4> result;
+    };
+    
+    template <>
+    struct ExtractSettingName<>{
       typedef settingName<0,0,0,0> result;
     };
 
@@ -824,14 +1230,24 @@ namespace icfg{
     }                                                       
 
     DECLARE_TYPE_EXTRACTOR_FOR(stringTag, std::string);
-    DECLARE_TYPE_EXTRACTOR_FOR(uint8_t, uint8_t);
-    DECLARE_TYPE_EXTRACTOR_FOR(int8_t, int8_t);
-    DECLARE_TYPE_EXTRACTOR_FOR(uint16_t, uint16_t);
-    DECLARE_TYPE_EXTRACTOR_FOR(int16_t, int16_t);
-    DECLARE_TYPE_EXTRACTOR_FOR(uint32_t, uint32_t);
-    DECLARE_TYPE_EXTRACTOR_FOR(int32_t, int32_t);
-    DECLARE_TYPE_EXTRACTOR_FOR(uint64_t, uint64_t);
-    DECLARE_TYPE_EXTRACTOR_FOR(int64_t, int64_t);
+    DECLARE_TYPE_EXTRACTOR_FOR(int8Tag, int8_t);
+    DECLARE_TYPE_EXTRACTOR_FOR(uint8Tag, uint8_t);
+    DECLARE_TYPE_EXTRACTOR_FOR(int16Tag, int16_t);
+    DECLARE_TYPE_EXTRACTOR_FOR(uint16Tag, uint16_t);
+    DECLARE_TYPE_EXTRACTOR_FOR(int32Tag, int32_t);
+    DECLARE_TYPE_EXTRACTOR_FOR(uint32Tag, uint32_t);
+    DECLARE_TYPE_EXTRACTOR_FOR(int64Tag, int64_t);
+    DECLARE_TYPE_EXTRACTOR_FOR(uint64Tag, uint64_t);
+    DECLARE_TYPE_EXTRACTOR_FOR(doubleTag, double);
+    DECLARE_TYPE_EXTRACTOR_FOR(floatTag, float);
+    // DECLARE_TYPE_EXTRACTOR_FOR(uint8_t, uint8_t);
+    // DECLARE_TYPE_EXTRACTOR_FOR(int8_t, int8_t);
+    // DECLARE_TYPE_EXTRACTOR_FOR(uint16_t, uint16_t);
+    // DECLARE_TYPE_EXTRACTOR_FOR(int16_t, int16_t);
+    // DECLARE_TYPE_EXTRACTOR_FOR(uint32_t, uint32_t);
+    // DECLARE_TYPE_EXTRACTOR_FOR(int32_t, int32_t);
+    // DECLARE_TYPE_EXTRACTOR_FOR(uint64_t, uint64_t);
+    // DECLARE_TYPE_EXTRACTOR_FOR(int64_t, int64_t);
     template <typename SubT, typename... Params>
     struct ExtractResultType<listTag<SubT>, Params...>{
       typedef std::vector<typename ExtractResultType<SubT>::type> type;
@@ -955,7 +1371,7 @@ namespace icfg{
     template <typename Name, typename... Params>
     struct MakeSwitchResult<Name, Params...>{
 
-      static_assert(isName<Name>::value, "The first parameter to a swicth definition must be a name");
+      static_assert(isName<Name>::value, "The first parameter to a switch definition must be a name");
 
       typedef switchResult<Name, typename ExtractSwitchParameters<Params>::type...> type;
     };
@@ -1279,9 +1695,11 @@ namespace icfg{
     };
 
 
+    template <typename... Params>
+    struct MaxSize;
 
     template <typename T, typename... Params>
-    struct MaxSize{
+    struct MaxSize<T, Params...>{
       static const size_t size = (sizeof(T)>=MaxSize<Params...>::size?sizeof(T):MaxSize<Params...>::size);
       static const size_t alignment = (alignof(T)>=MaxSize<Params...>::alignment?alignof(T):MaxSize<Params...>::alignment);
     };
@@ -1290,6 +1708,12 @@ namespace icfg{
     struct MaxSize<T>{
       static const size_t size = sizeof(T);
       static const size_t alignment = alignof(T);
+    };
+    
+    template <>
+    struct MaxSize<>{
+      static const size_t size = 0;
+      static const size_t alignment = 8;
     };
 
     template <typename RefSettingName, typename... Cases>
