@@ -277,6 +277,7 @@ namespace icfg{
     template<class T>
     struct listTag{};//-> std::vector
     
+    struct booleanTag {};
     struct int8Tag {};
     struct uint8Tag {};
     struct int16Tag {};
@@ -294,23 +295,26 @@ namespace icfg{
 
 
   }
-  extern internal::stringTag string;
-  extern internal::int8Tag int8;
-  extern internal::uint8Tag uint8;
-  extern internal::int16Tag int16;
-  extern internal::uint16Tag uint16;
-  extern internal::int32Tag int32;
-  extern internal::uint32Tag uint32;
-  extern internal::int64Tag int64;
-  extern internal::uint64Tag uint64;
-  extern internal::floatTag float32;
-  extern internal::doubleTag float64;
+  static internal::stringTag string;
+  static internal::booleanTag boolean;
+  static internal::int8Tag int8;
+  static internal::uint8Tag uint8;
+  static internal::int16Tag int16;
+  static internal::uint16Tag uint16;
+  static internal::int32Tag int32;
+  static internal::uint32Tag uint32;
+  static internal::int64Tag int64;
+  static internal::uint64Tag uint64;
+  static internal::floatTag float32;
+  static internal::doubleTag float64;
 
   template <typename T>
-  internal::listTag<T> list(T){}
+  internal::listTag<T> list(T) {
+      return internal::listTag<T>();
+  }
   
-  extern internal::optionalTag optional;
-  extern internal::requiredTag required;
+  static internal::optionalTag optional;
+  static internal::requiredTag required;
     
 /*****************************************************
     Constraints
@@ -333,42 +337,36 @@ namespace icfg{
         static bool test(size_t ref, size_t actual){
           return ref==actual;
         }
-        static constexpr const char* Description = "equal";
         static const internal::LengthConstraint_internal::LengthConstraintType::LengthConstraintType Type = internal::LengthConstraint_internal::LengthConstraintType::Equal;
       };
       struct GreaterEqual{
         static bool test(size_t ref, size_t actual){
           return actual>=ref;
         }
-        static constexpr const char* Description = "greater or equal";
         static const internal::LengthConstraint_internal::LengthConstraintType::LengthConstraintType Type = internal::LengthConstraint_internal::LengthConstraintType::GreaterOrEqual;
       };
       struct Greater{
         static bool test(size_t ref, size_t actual){
           return actual>ref;
         }
-        static constexpr const char* Description = "greater";
         static const internal::LengthConstraint_internal::LengthConstraintType::LengthConstraintType Type = internal::LengthConstraint_internal::LengthConstraintType::Greater;
       };
       struct LessEqual{
         static bool test(size_t ref, size_t actual){
           return actual<=ref;
         }
-        static constexpr const char* Description = "less or equal";
         static const internal::LengthConstraint_internal::LengthConstraintType::LengthConstraintType Type = internal::LengthConstraint_internal::LengthConstraintType::LessOrEqual;
       };
       struct Less{
         static bool test(size_t ref, size_t actual){
           return actual<ref;
         }
-        static constexpr const char* Description = "less";
         static const internal::LengthConstraint_internal::LengthConstraintType::LengthConstraintType Type = internal::LengthConstraint_internal::LengthConstraintType::Less;
       };
       struct Different{
         static bool test(size_t ref, size_t actual){
           return actual!=ref;
         }
-        static constexpr const char* Description = "different";
         static const internal::LengthConstraint_internal::LengthConstraintType::LengthConstraintType Type = internal::LengthConstraint_internal::LengthConstraintType::Different;
       };
     }
@@ -863,75 +861,81 @@ namespace icfg{
     
     //macros for fancier formatting of constraints inside the function definitions
     #define CHECK_FORBIDDEN(CONTEXT, TYPE_DESC, TYPE, PARAMS) \
-      static_assert(!internal::one_true<decltype(internal::is_one_or_instance_of<TYPE>(std::declval<PARAMS>()))::value...>::value, "Forbidden "#TYPE_DESC" parameter to "#CONTEXT" function.")
+      static_assert(!internal::one_true<(decltype(internal::is_one_or_instance_of<TYPE>(std::declval<PARAMS>()))::value)...>::value, "Forbidden "#TYPE_DESC" parameter to "#CONTEXT" function.")
 
     #define CHECK_REQUIRED(CONTEXT, TYPE_DESC, TYPE, PARAMS) \
-      static_assert(internal::one_true<decltype(internal::is_one_or_instance_of<TYPE>(std::declval<PARAMS>()))::value...>::value, "missing required parameter "#TYPE_DESC" in "#CONTEXT)
+      static_assert(internal::one_true<(decltype(internal::is_one_or_instance_of<TYPE>(std::declval<PARAMS>()))::value)...>::value, "missing required parameter "#TYPE_DESC" in "#CONTEXT)
 
     #define CHECK_UNIQUE(CONTEXT, TYPE_DESC, TYPE, PARAMS) \
-      static_assert(!internal::more_than_one_true<decltype(internal::is_one_or_instance_of<TYPE>(std::declval<PARAMS>()))::value...>::value, "parameter "#TYPE_DESC" should be unique for "#CONTEXT)
+      static_assert(!internal::more_than_one_true<(decltype(internal::is_one_or_instance_of<TYPE>(std::declval<PARAMS>()))::value)...>::value, "parameter "#TYPE_DESC" should be unique for "#CONTEXT)
       
-    #define CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ) \
+    #define CHECK_ALLOWED_UNROLL_PARAM_1( PARAMS,P1 ) \
       decltype(internal::is_one_or_instance_of<P1>(std::declval<PARAMS>()))::value
       
-    #define CHECK_ALLOWED_UNROLL_PARAM_2( P1, P2, PARAMS ) \
-      CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ), \
-      CHECK_ALLOWED_UNROLL_PARAM_1( P2, PARAMS )
+    #define CHECK_ALLOWED_UNROLL_PARAM_2( PARAMS,P1, P2 ) \
+      CHECK_ALLOWED_UNROLL_PARAM_1( PARAMS,P1 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_1( PARAMS,P2 )
       
-    #define CHECK_ALLOWED_UNROLL_PARAM_3( P1, P2, P3, PARAMS ) \
-      CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ), \
-      CHECK_ALLOWED_UNROLL_PARAM_2( P2, P3, PARAMS )
+    #define CHECK_ALLOWED_UNROLL_PARAM_3( PARAMS,P1, P2, P3 ) \
+      CHECK_ALLOWED_UNROLL_PARAM_1( PARAMS,P1 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_2( PARAMS,P2, P3 )
 
-    #define CHECK_ALLOWED_UNROLL_PARAM_4( P1, P2, P3, P4, PARAMS ) \
-      CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ), \
-      CHECK_ALLOWED_UNROLL_PARAM_3( P2, P3, P4, PARAMS )
+    #define CHECK_ALLOWED_UNROLL_PARAM_4( PARAMS,P1, P2, P3, P4 ) \
+      CHECK_ALLOWED_UNROLL_PARAM_1( PARAMS,P1 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_3( PARAMS,P2, P3, P4 )
 
-    #define CHECK_ALLOWED_UNROLL_PARAM_5( P1, P2, P3, P4, P5, PARAMS ) \
-      CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ), \
-      CHECK_ALLOWED_UNROLL_PARAM_4( P2, P3, P4, P5, PARAMS )
+    #define CHECK_ALLOWED_UNROLL_PARAM_5( PARAMS,P1, P2, P3, P4, P5 ) \
+      CHECK_ALLOWED_UNROLL_PARAM_1( PARAMS,P1 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_4( PARAMS,P2, P3, P4, P5 )
 
-    #define CHECK_ALLOWED_UNROLL_PARAM_6( P1, P2, P3, P4, P5, P6, PARAMS ) \
-      CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ), \
-      CHECK_ALLOWED_UNROLL_PARAM_5( P2, P3, P4, P5, P6, PARAMS )
+    #define CHECK_ALLOWED_UNROLL_PARAM_6( PARAMS,P1, P2, P3, P4, P5, P6 ) \
+      CHECK_ALLOWED_UNROLL_PARAM_1( PARAMS,P1 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_5( PARAMS,P2, P3, P4, P5, P6 )
 
-    #define CHECK_ALLOWED_UNROLL_PARAM_7( P1, P2, P3, P4, P5, P6, P7, PARAMS ) \
-      CHECK_ALLOWED_UNROLL_PARAM_1( P1, PARAMS ), \
-      CHECK_ALLOWED_UNROLL_PARAM_6( P2, P3, P4, P5, P6, P7, PARAMS )
+    #define CHECK_ALLOWED_UNROLL_PARAM_7( PARAMS,P1, P2, P3, P4, P5, P6, P7 ) \
+      CHECK_ALLOWED_UNROLL_PARAM_1( PARAMS,P1 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_6( PARAMS,P2, P3, P4, P5, P6, P7 )
       
-    #define CHECK_ALLOWED_UNROLL_PARAM_8( P1, P2, P3, P4, P5, P6, P7, P8, PARAMS ) \
-      CHECK_ALLOWED_UNROLL_PARAM_4( P1, P2, P3, P4, PARAMS ), \
-      CHECK_ALLOWED_UNROLL_PARAM_4( P5, P6, P7, P8, PARAMS )
+    #define CHECK_ALLOWED_UNROLL_PARAM_8( PARAMS,P1, P2, P3, P4, P5, P6, P7, P8 ) \
+      CHECK_ALLOWED_UNROLL_PARAM_4( PARAMS,P1, P2, P3, P4 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_4( PARAMS,P5, P6, P7, P8 )
       
-    #define CHECK_ALLOWED_UNROLL_PARAM_9( P1, P2, P3, P4, P5, P6, P7, P8, P9, PARAMS ) \
-      CHECK_ALLOWED_UNROLL_PARAM_4( P1, P2, P3, P4, PARAMS ), \
-      CHECK_ALLOWED_UNROLL_PARAM_5( P5, P6, P7, P8, P9, PARAMS )
+    #define CHECK_ALLOWED_UNROLL_PARAM_9( PARAMS,P1, P2, P3, P4, P5, P6, P7, P8, P9 ) \
+      CHECK_ALLOWED_UNROLL_PARAM_4( PARAMS,P1, P2, P3, P4 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_5( PARAMS,P5, P6, P7, P8, P9 )
       
-    #define CHECK_ALLOWED_UNROLL_PARAM_10( P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, PARAMS ) \
-      CHECK_ALLOWED_UNROLL_PARAM_5( P1, P2, P3, P4, P5, PARAMS ), \
-      CHECK_ALLOWED_UNROLL_PARAM_5( P6, P7, P8, P9, P10, PARAMS )
+    #define CHECK_ALLOWED_UNROLL_PARAM_10( PARAMS,P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 ) \
+      CHECK_ALLOWED_UNROLL_PARAM_5( PARAMS,P1, P2, P3, P4, P5 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_5( PARAMS,P6, P7, P8, P9, P10 )
       
-    #define CHECK_ALLOWED_UNROLL_PARAM_11( P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, PARAMS ) \
-      CHECK_ALLOWED_UNROLL_PARAM_5( P1, P2, P3, P4, P5, PARAMS ), \
-      CHECK_ALLOWED_UNROLL_PARAM_6( P6, P7, P8, P9, P10, P11, PARAMS )
+    #define CHECK_ALLOWED_UNROLL_PARAM_11( PARAMS,P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11 ) \
+      CHECK_ALLOWED_UNROLL_PARAM_5( PARAMS,P1, P2, P3, P4, P5 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_6( PARAMS,P6, P7, P8, P9, P10, P11 )
     
-    #define CHECK_ALLOWED_UNROLL_PARAM_12( P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, PARAMS ) \
-      CHECK_ALLOWED_UNROLL_PARAM_6( P1, P2, P3, P4, P5, P12, PARAMS ), \
-      CHECK_ALLOWED_UNROLL_PARAM_6( P6, P7, P8, P9, P10, P11, PARAMS )
+    #define CHECK_ALLOWED_UNROLL_PARAM_12(PARAMS, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12 ) \
+      CHECK_ALLOWED_UNROLL_PARAM_6(PARAMS, P1, P2, P3, P4, P5, P12 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_6(PARAMS, P6, P7, P8, P9, P10, P11 )
       
-    #define CHECK_ALLOWED_UNROLL_PARAM_13( P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, PARAMS ) \
-      CHECK_ALLOWED_UNROLL_PARAM_7( P1, P2, P3, P4, P5, P12, P13, PARAMS ), \
-      CHECK_ALLOWED_UNROLL_PARAM_6( P6, P7, P8, P9, P10, P11, PARAMS )
+    #define CHECK_ALLOWED_UNROLL_PARAM_13(PARAMS, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13 ) \
+      CHECK_ALLOWED_UNROLL_PARAM_7(PARAMS, P1, P2, P3, P4, P5, P12, P13 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_6(PARAMS, P6, P7, P8, P9, P10, P11 )
       
-    #define CHECK_ALLOWED_UNROLL_PARAM_14( P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, PARAMS ) \
-      CHECK_ALLOWED_UNROLL_PARAM_7( P1, P2, P3, P4, P5, P12, P13, PARAMS ), \
-      CHECK_ALLOWED_UNROLL_PARAM_7( P6, P7, P8, P9, P10, P11, P14, PARAMS )
+    #define CHECK_ALLOWED_UNROLL_PARAM_14(PARAMS, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14) \
+      CHECK_ALLOWED_UNROLL_PARAM_7(PARAMS, P1, P2, P3, P4, P5, P12, P13 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_7(PARAMS, P6, P7, P8, P9, P10, P11, P14 )
+
+    #define CHECK_ALLOWED_UNROLL_PARAM_15(PARAMS, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15) \
+      CHECK_ALLOWED_UNROLL_PARAM_7(PARAMS, P1, P2, P3, P4, P5, P12, P13 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_8(PARAMS, P6, P7, P8, P9, P10, P11, P14, P15 )
+
+    #define CALL_CHECK_ALLOWED_UNROLL_PARAM(MACRO, PARAMS) MACRO PARAMS
       
     #define CHECK_ALLOWED(N, CONTEXT, PARAMS, ...)                  \
       static_assert(                                                \
         internal::all_true<                                                   \
-          internal::one_true<                                                 \
-            CHECK_ALLOWED_UNROLL_PARAM_ ##N ( __VA_ARGS__, PARAMS)  \
-          >::value...                                               \
+          (internal::one_true<                                                 \
+            CALL_CHECK_ALLOWED_UNROLL_PARAM(CHECK_ALLOWED_UNROLL_PARAM_ ##N, (PARAMS, __VA_ARGS__))  \
+          >::value)...                                               \
         >::value,                                                   \
         "found parameter not allowed in "#CONTEXT)
         
@@ -972,7 +976,7 @@ namespace icfg{
     CHECK_FORBIDDEN(setting, setting, settingDef, Params);
     CHECK_FORBIDDEN(setting, section, sectionDef, Params);
     
-    CHECK_ALLOWED( 14, setting, Params, settingName, listTag, stringTag, LengthConstraint, int8Tag, uint8Tag, int16Tag, uint16Tag, int32Tag, uint32Tag, int64Tag, uint64Tag, floatTag, doubleTag);
+    CHECK_ALLOWED( 15, setting, Params, settingName, listTag, stringTag, LengthConstraint, booleanTag, int8Tag, uint8Tag, int16Tag, uint16Tag, int32Tag, uint32Tag, int64Tag, uint64Tag, floatTag, doubleTag);
     
     CHECK_REQUIRED(setting, settingName, settingName, Params);
     CHECK_UNIQUE(setting, settingName, settingName, Params);
@@ -983,6 +987,7 @@ namespace icfg{
       internal::one_true<
         ICFG_IS(stringTag),
         ICFG_IS(listTag),
+        ICFG_IS(booleanTag),
         ICFG_IS(int8Tag),
         ICFG_IS(uint8Tag),
         ICFG_IS(int16Tag),
@@ -999,6 +1004,7 @@ namespace icfg{
       !internal::more_than_one_true<
         ICFG_IS(stringTag),
         ICFG_IS(listTag),
+        ICFG_IS(booleanTag),
         ICFG_IS(int8Tag),
         ICFG_IS(uint8Tag),
         ICFG_IS(int16Tag),
@@ -1013,6 +1019,7 @@ namespace icfg{
       
     static_assert(
       internal::one_true<
+        ICFG_IS(booleanTag),
         ICFG_IS(int8Tag),
         ICFG_IS(uint8Tag),
         ICFG_IS(int16Tag),
@@ -1218,6 +1225,11 @@ namespace icfg{
     struct ExtractResultType{
       typedef typename ExtractResultType<Params...>::type type;
     };
+    
+    template <typename FirstParam>
+    struct ExtractResultType<FirstParam>{
+      typedef empty_t type;
+    };
 
     #define DECLARE_TYPE_EXTRACTOR_FOR(TypeDesc, DestType)    \
     template <typename... Params>                             \
@@ -1230,6 +1242,7 @@ namespace icfg{
     }                                                       
 
     DECLARE_TYPE_EXTRACTOR_FOR(stringTag, std::string);
+    DECLARE_TYPE_EXTRACTOR_FOR(booleanTag, bool);
     DECLARE_TYPE_EXTRACTOR_FOR(int8Tag, int8_t);
     DECLARE_TYPE_EXTRACTOR_FOR(uint8Tag, uint8_t);
     DECLARE_TYPE_EXTRACTOR_FOR(int16Tag, int16_t);
@@ -1260,7 +1273,7 @@ namespace icfg{
     template <typename... Params>
     struct ExtractSettingType{
       typedef typename ExtractOccurence<typename ExtractResultType<Params...>::type, Params...>::type type;
-      static_assert(!std::is_same<type, empty_t>::value, "Could not deduce setting result type");
+      //static_assert(!std::is_same<type, empty_t>::value, "Could not deduce setting result type");
     };
 
 /*****************************************************
@@ -1301,9 +1314,10 @@ namespace icfg{
     handlers depending on the name of the parameter
 ******************************************************/
       
+    
     template <template <typename...> class ParamT, typename... Params>
     struct UnpackConfigParameter{
-      typedef std::tuple<empty_t> type;
+      typedef std::tuple<> type;
     };
 
     //match a "settingDef" tag
@@ -1345,10 +1359,14 @@ namespace icfg{
     //generate the result of one definition node
     template <template <typename...> class ParamT, typename... Params>
     auto UnpackConfigParameterATD(ParamT<Params...>) -> typename UnpackConfigParameter<ParamT,Params...>::type {}
+    
+    //yield a valid overload, static_asserts take care of avoiding this case
+    template <class ParamT>
+    auto UnpackConfigParameterATD(ParamT) -> std::tuple<> {}
 
     //generate the results of Params... merged into a tuple
     template <typename... Params>
-    auto MakeParametersResults(Params... params) -> decltype(std::tuple_cat(std::declval<decltype(UnpackConfigParameterATD(params))>()...)) {}
+    auto MakeParametersResults(Params... params) -> decltype(std::tuple_cat(std::declval<decltype(UnpackConfigParameterATD(params))>()...)) { return std::tuple_cat(std::declval<decltype(UnpackConfigParameterATD(params))>()...); }
 
 /*****************************************************
     MakeSwitchResult 
@@ -1356,7 +1374,6 @@ namespace icfg{
       
     template <typename Param>
     struct ExtractSwitchParameters{
-      static_assert(std::is_same<typename ExtractSwitchParameters<Param>::type, empty_t>::value, "Switch definitions can only contain case defitions");
       typedef empty_t type;
     };
 
@@ -1371,8 +1388,6 @@ namespace icfg{
     template <typename Name, typename... Params>
     struct MakeSwitchResult<Name, Params...>{
 
-      static_assert(isName<Name>::value, "The first parameter to a switch definition must be a name");
-
       typedef switchResult<Name, typename ExtractSwitchParameters<Params>::type...> type;
     };
   
@@ -1381,13 +1396,13 @@ namespace icfg{
 ******************************************************/
       
     template <typename... Params>
-    struct MakeCaseResult;
+    struct MakeCaseResult{
+      typedef empty_t type;
+    };
 
     template <typename Name, typename... Params>
     struct MakeCaseResult<Name, Params...>{
 
-      static_assert(isName<Name>::value, "The first parameter to a case definition must be a name");
-      
       template <typename... ParamsResult>
       static auto Makeit(std::tuple<ParamsResult...> params) -> caseResult<Name, ParamsResult...> {}
 
@@ -1417,15 +1432,22 @@ namespace icfg{
       
       
     public:
+    
       template <typename... Ps>
       static auto removeName(Ps...) -> decltype(std::tuple_cat( std::declval<typename std::conditional<isName<Ps>::value, std::tuple<>, std::tuple<Ps>>::type>()...)){
       }
       
       template <typename... ParamsResult>
-      static auto Makeit(std::tuple<ParamsResult...> params) -> groupResult<ParamsResult...> {}
+      static auto Makeit(std::tuple<ParamsResult...> params) -> groupResult<ParamsResult...> {
+        static_assert(sizeof...(ParamsResult)==-1, "1428");
+      }
       
       template <typename... Ps>
-      static auto callMakeConfigResult(std::tuple<Ps...>)-> decltype(Makeit(MakeParametersResults(std::declval<Ps>()...))){}
+      static auto callMakeConfigResult(std::tuple<Ps...>)-> decltype(Makeit(MakeParametersResults(std::declval<Ps>()...))){
+        
+      }
+      //Makeit(MakeParametersResults(std::declval<Ps>()...))
+      //static_assert(std::is_same<decltype(Makeit(MakeParametersResults(removeName(std::declval<Params>()...)))), bool>::value, "1436");
       
     public:
       typedef decltype(callMakeConfigResult(removeName(std::declval<Params>()...))) type;
@@ -1626,14 +1648,9 @@ namespace icfg{
       
       
       template <typename Name>
-      auto getValue(Name) -> typename std::add_lvalue_reference<typename ExtractSettingFromName<Name,Values...>::result::myType>::type{
-        return getValue<Name>();
-      }
-      
-      template <typename Name>
-      auto getValue() -> typename std::add_lvalue_reference<typename ExtractSettingFromName<Name,Values...>::result::myType>::type{
+      auto get(Name = Name()) -> typename std::add_lvalue_reference<typename ExtractSettingFromName<Name,Values...>::result::myType>::type{
         static_assert(!std::is_same<typename ExtractSettingFromName<Name,Values...>::result,empty_t>::value, "Setting does not exist in the configuration");
-        return std::get<ExtractSettingFromName<Name,Values...>::index>(settings).getValue();
+        return std::get<ExtractSettingFromName<Name,Values...>::index>(settings).get();
       }
       
     };
@@ -1687,7 +1704,7 @@ namespace icfg{
       template <typename SwitchType, typename Functor>
       static void call(const std::string& ref, Functor&& fctor){
         if (settingName<T1,T2,T3,T4>::getString()==ref){
-          fctor.template operator()<settingName<T1,T2,T3,T4>>();
+          fctor.template function<settingName<T1,T2,T3,T4>>();
         } else {
           GetCaseNameFromStr<Params...>::template call<SwitchType,Functor>(ref,fctor);
         }
@@ -1712,7 +1729,7 @@ namespace icfg{
     
     template <>
     struct MaxSize<>{
-      static const size_t size = 0;
+      static const size_t size = 1;
       static const size_t alignment = 8;
     };
 
@@ -1753,11 +1770,11 @@ namespace icfg{
         activeValue = settingName::getString();
       }
       
-      myType& getValue(){
+      myType& get(){
         return *this;
       }
       
-      const myType& getValue() const {
+      const myType& get() const {
         return *this;
       }
       
@@ -1778,7 +1795,7 @@ namespace icfg{
         : mMe(me){}
         
         template <typename Name>
-        void operator()(){
+        void function(){
           mMe.template activateCase<Name>(Name());
         }
       };
@@ -1787,6 +1804,8 @@ namespace icfg{
         ActivateCase define(*this);
         GetCaseNameFromStr<Cases...>::template call<myType>(name, define);
       }
+
+      static_assert(MaxSize<Cases...>::size>0, "zero sized storage");
       
       typename std::aligned_storage<MaxSize<Cases...>::size, MaxSize<Cases...>::alignment>::type storage;
       
@@ -1803,8 +1822,8 @@ namespace icfg{
       groupResult<Settings...> result;
       
       template <typename SettingName>
-      auto getValue(SettingName) -> decltype(result.template getValue<SettingName>()){
-        return result.getValue<SettingName>();
+      auto get(SettingName) -> decltype(result.template get<SettingName>()){
+        return result.get<SettingName>();
       }
       
       template <typename SettingName>
@@ -1853,11 +1872,11 @@ namespace icfg{
       }
       
       template <typename Name>
-      auto getValue(Name) -> decltype(result.template getValue<Name>()){
+      auto get(Name) -> decltype(result.template get<Name>()){
         if (hasError()){
           throw std::string("Cannot access  config when error occured");
         }
-        return result.getValue<Name>();
+        return result.get<Name>();
       }
       
       template <typename Name>
@@ -1898,11 +1917,11 @@ namespace icfg{
       settingResult(myType val)
       : value(val){}
       
-      myType& getValue(){
+      myType& get(){
         return value;
       }
       
-      const myType& getValue() const {
+      const myType& get() const {
         return value;
       }
     };
@@ -1952,8 +1971,8 @@ namespace icfg{
       , mDefinition(definition){}
 
       template <typename Name>
-      void operator()(){
-        mErrors = ConfigValueLoader_t<ConfigBackend>::load(mConfigLoader, mParentValue, mSwitchRes.template getCase(Name()), mDefinition.template getCase(Name()));
+      void function(){
+        mErrors = ConfigValueLoader_t<ConfigBackend>::load(mConfigLoader, mParentValue, mSwitchRes.getCase(Name()), mDefinition.getCase(Name()));
       }
     };
 
@@ -2031,7 +2050,7 @@ namespace icfg{
           setting.activateCase(switchValue);
           
           auto visitor = make_caseResultLoaderVisitor(configLoader, parentValue, setting, definition);
-          setting.template visitCase(switchValue, visitor);
+          setting.visitCase(switchValue, visitor);
           std::vector<ConfigError> validationErrors = definition.validate(setting);
           visitor.mErrors.insert(visitor.mErrors.end(), validationErrors.begin(), validationErrors.end());
           return visitor.mErrors;
