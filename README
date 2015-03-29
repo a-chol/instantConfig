@@ -28,10 +28,10 @@ if (cfg.hasError()){
 }
 
 //the access to the setting "AppName" brings a std::string typed result
-std::cout<<"AppName : "<<cfg.getValue(STG_NAME("AppName"))<<std::endl;
+std::cout<<"AppName : "<<cfg.get(STG_NAME("AppName"))<<std::endl;
 
 //whereas the access to "NameList" brings a std::vector<std::string> result
 std::cout<<"NameList : ";
-for (auto& name : cfg.getValue(STG_NAME("NameList"))){
+for (auto& name : cfg.get(STG_NAME("NameList"))){
   std::cout<<name<<',';
 }
