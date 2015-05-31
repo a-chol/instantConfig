@@ -4,7 +4,7 @@ using namespace icfg;
 
 auto myConfig = 
 config(
-  setting(STG_NAME("mySetting"), string)
+  setting(ICFG_STR("mySetting"), string)
 );
 
 int main(){

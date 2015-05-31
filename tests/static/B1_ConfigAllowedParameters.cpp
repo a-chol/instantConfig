@@ -7,18 +7,18 @@ auto configEmpty = config();
 
 auto configSetting = 
 config(
-  setting(STG_NAME("mySetting"), string)
+  setting(ICFG_STR("mySetting"), string)
 );
 
 auto configSection = 
 config(
-  section(STG_NAME("section"))
+  section(ICFG_STR("section"))
 );
 
 auto configSwitch = 
 config(
-  switchOn(STG_NAME("mySetting"), 
-    caseOf(STG_NAME("val1"))
+  switchOn(ICFG_STR("mySetting"), 
+    caseOf(ICFG_STR("val1"))
   )
 );
 
@@ -29,7 +29,7 @@ config(
 
 auto configMap = 
 config(
-  map(STG_NAME("mapKey"))
+  map(ICFG_STR("mapKey"))
 );
 
 int main(){

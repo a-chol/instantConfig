@@ -23,13 +23,13 @@ include_directories(
   ${CMAKE_BINARY_DIR}
 )
 
-add_executable(icfg-static-test build_test_runner.cpp)
+add_executable(icfg-test build_test_runner.cpp compile_test_suite.cpp runtime_test_suite.cpp)
 
 if (UNIX)
   set(ADDITIONAL_LIBS "stdc++" "pthread")
 endif (UNIX)
 
-target_link_libraries(icfg-static-test ${GTEST_LIBRARIES} ${ADDITIONAL_LIBS})
+target_link_libraries(icfg-test ${GTEST_LIBRARIES} ${ADDITIONAL_LIBS})
 
 get_filename_component(COMPILER_BINARY ${CMAKE_CXX_COMPILER} NAME)
 
@@ -51,7 +51,7 @@ if (IS_UNIX_COMPILER)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
 endif (IS_UNIX_COMPILER)
 
-GTEST_ADD_TESTS(icfg-static-test "" build_test_runner.cpp)
+GTEST_ADD_TESTS(icfg-test "" compile_test_suite.cpp)
 
 include(GenerateTestProject.cmake)
 

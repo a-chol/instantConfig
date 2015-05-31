@@ -5,10 +5,10 @@ using namespace icfg;
 auto settingString = 
 config(
   setting(
-    STG_NAME("mySetting"),
+    ICFG_STR("mySetting"),
     string,
     setting(
-      STG_NAME("myInnerSetting"),
+      ICFG_STR("myInnerSetting"),
       string
     )
   )

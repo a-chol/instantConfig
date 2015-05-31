@@ -5,9 +5,9 @@ using namespace icfg;
 auto settingString = 
 config(
   switchOn(
-    STG_NAME("switchValue"),
+    ICFG_STR("switchValue"),
     map(
-      STG_NAME("switchValue2")
+      ICFG_STR("switchValue2")
     )
   )
 );

@@ -5,7 +5,7 @@ using namespace icfg;
 auto settingString = 
 config(
   section(
-    STG_NAME("section"),
+    ICFG_STR("section"),
     
     string
     
@@ -15,7 +15,7 @@ config(
 auto settingList = 
 config(
   section(
-    STG_NAME("section"),
+    ICFG_STR("section"),
     
     list(string)
     

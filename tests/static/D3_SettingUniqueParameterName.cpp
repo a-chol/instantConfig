@@ -5,8 +5,8 @@ using namespace icfg;
 auto settingString = 
 config(
   setting(
-    STG_NAME("mySetting"),
-    STG_NAME("mySetting2"),
+    ICFG_STR("mySetting"),
+    ICFG_STR("mySetting2"),
     string
   )
 );

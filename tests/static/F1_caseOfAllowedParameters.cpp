@@ -7,14 +7,14 @@ auto emptyConfig = config();
 auto settingString = 
 config(
   switchOn(
-    STG_NAME("switchValue"),
+    ICFG_STR("switchValue"),
     caseOf(
-      STG_NAME("caseOne"),
-      setting(STG_NAME("settingName"),string),
-      section(STG_NAME("section")),
-      switchOn(STG_NAME("switchValue2")),
+      ICFG_STR("caseOne"),
+      setting(ICFG_STR("settingName"),string),
+      section(ICFG_STR("section")),
+      switchOn(ICFG_STR("switchValue2")),
       include(emptyConfig),
-      map(STG_NAME("map"))
+      map(ICFG_STR("map"))
     )
   )
 );

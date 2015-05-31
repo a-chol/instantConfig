@@ -6,9 +6,9 @@ auto settingString =
 config(
   switchOn(
     caseOf(
-      STG_NAME("caseOne")
+      ICFG_STR("caseOne")
     ),
-    STG_NAME("switchValue")
+    ICFG_STR("switchValue")
   )
 );
 

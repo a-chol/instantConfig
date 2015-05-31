@@ -5,9 +5,9 @@ using namespace icfg;
 auto settingString = 
 config(
   setting(
-    STG_NAME("mySetting"),
+    ICFG_STR("mySetting"),
     string,
-    switchOn(STG_NAME("mySection"))
+    switchOn(ICFG_STR("mySection"))
   )
 );
 

@@ -7,7 +7,7 @@ auto configEmpty = config();
 
 auto configSetting = 
 config(
-  STG_NAME("mySetting")
+  ICFG_STR("mySetting")
 );
 
 int main(){

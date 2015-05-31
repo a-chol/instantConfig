@@ -5,9 +5,9 @@ using namespace icfg;
 auto settingString = 
 config(
   section(
-    STG_NAME("section"),
+    ICFG_STR("section"),
     
-    caseOf(STG_NAME("caseOne"))
+    caseOf(ICFG_STR("caseOne"))
     
   )
 );

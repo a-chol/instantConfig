@@ -6,12 +6,12 @@ auto configEmpty = config();
 
 auto settingString = 
 config(
-  section(STG_NAME("caseOne"),
-    setting(STG_NAME("settingName"),string),
-    section(STG_NAME("section")),
-    switchOn(STG_NAME("switchValue2")),
+  section(ICFG_STR("caseOne"),
+    setting(ICFG_STR("settingName"),string),
+    section(ICFG_STR("section")),
+    switchOn(ICFG_STR("switchValue2")),
     include(configEmpty),
-    map(STG_NAME("map"))
+    map(ICFG_STR("map"))
   )
 );
 

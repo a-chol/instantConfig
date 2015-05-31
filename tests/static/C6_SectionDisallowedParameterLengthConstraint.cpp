@@ -5,7 +5,7 @@ using namespace icfg;
 auto sectionTest = 
 config(
   section(
-    STG_NAME("mySetting"),
+    ICFG_STR("mySetting"),
     length>5
   )
 );

@@ -86,7 +86,7 @@ namespace icfg{
     caseDef<Params...> make_caseDef(const std::tuple<Params...>& params){
       return caseDef<Params...>(params);
     }
-
+    
     template <typename Name, typename type>
     struct settingResult;
     template <typename... Values>
@@ -221,8 +221,8 @@ namespace icfg{
       }
     };
 
-    constexpr uint64_t encodeStr(char const* str, size_t sz, int8_t index=0, int8_t off=0){
-      return (sz<33 && index<sz && off<8) ? ((static_cast<uint64_t>(str[index])<<(56-8*off))|encodeStr(str, sz, index+1, off+1)): 0;
+    constexpr uint64_t encodeStrChunk(char const* str, size_t sz, int8_t index=0, int8_t off=0){
+      return (sz<33 && index<sz && off<8) ? ((static_cast<uint64_t>(str[index])<<(56-8*off))|encodeStrChunk(str, sz, index+1, off+1)): 0;
     }
 
     template <typename T>
@@ -237,7 +237,35 @@ namespace icfg{
     
   }
 
-#define STG_NAME(name) icfg::internal::settingName<icfg::internal::encodeStr(name, sizeof(name)), icfg::internal::encodeStr(name, sizeof(name), 8),icfg::internal::encodeStr(name, sizeof(name), 16),icfg::internal::encodeStr(name, sizeof(name), 24)>(name)
+#define ICFG_STR(name) icfg::internal::settingName<icfg::internal::encodeStrChunk(name, sizeof(name)), icfg::internal::encodeStrChunk(name, sizeof(name), 8),icfg::internal::encodeStrChunk(name, sizeof(name), 16),icfg::internal::encodeStrChunk(name, sizeof(name), 24)>(name)
+
+
+
+/*****************************************************
+    index_sequence_for : until c++14, define a helper 
+    that creates a integer_sequence<0,..,N-1>
+    from the number of parameters to index_sequence_for
+******************************************************/
+
+  namespace internal{
+    template<size_t ...>
+    struct integer_sequence { };
+
+    template<int N, size_t ...S>
+    struct gens : gens<N-1, N-1, S...> { };
+
+    template<size_t ...S>
+    struct gens<0, S...> {
+      typedef integer_sequence<S...> type;
+    };
+
+    template <typename... Params>
+    using index_sequence_for = typename gens<sizeof...(Params)>::type;
+    
+    template <size_t s>
+    using index_sequence_size = typename gens<s>::type;
+    
+  }
 /*****************************************************
     Error classes
 ******************************************************/
@@ -382,12 +410,12 @@ namespace icfg{
       }
       
       ConfigError getError(size_t pActual) const{
-        std::string constraintDescription = ConstraintT::Type==internal::LengthConstraint_internal::LengthConstraintType::Equal? "equal" :
-                                            ConstraintT::Type==internal::LengthConstraint_internal::LengthConstraintType::Different? "different from" :
-                                            ConstraintT::Type==internal::LengthConstraint_internal::LengthConstraintType::Greater? "greater than" :
+        std::string constraintDescription = ConstraintT::Type==internal::LengthConstraint_internal::LengthConstraintType::Equal?          "equal" :
+                                            ConstraintT::Type==internal::LengthConstraint_internal::LengthConstraintType::Different?      "different from" :
+                                            ConstraintT::Type==internal::LengthConstraint_internal::LengthConstraintType::Greater?        "greater than" :
                                             ConstraintT::Type==internal::LengthConstraint_internal::LengthConstraintType::GreaterOrEqual? "greater or equal to" :
-                                            ConstraintT::Type==internal::LengthConstraint_internal::LengthConstraintType::Less? "less than" :
-                                            "less or equal to";
+                                            ConstraintT::Type==internal::LengthConstraint_internal::LengthConstraintType::Less?           "less than" :
+                                                                                                                                          "less or equal to";
         return ConfigError("Length constraint failed : size must be "+constraintDescription+" "+std::to_string(mRef)+", actual is "+std::to_string(pActual));
       }
       
@@ -422,26 +450,94 @@ namespace icfg{
   
   static internal::lengthTag length;
   
-/*****************************************************
-    index_sequence_for : until c++14, define a helper 
-    that creates a integer_sequence<0,..,N-1>
-    from the number of parameters to index_sequence_for
+  /*****************************************************
+    FunctorConstraint : a generic constraint that
+    checks the result of a functor
 ******************************************************/
-
+  
+  template <typename Name, typename... Validators>
+  struct FunctorConstraint;
+  
+  template <typename Name>
+  struct FunctorConstraint<Name>{
+    
+    FunctorConstraint(){}
+    
+    template <typename ParameterT>
+    bool validate(const ParameterT& pActual) const{
+      return true;
+    }
+    
+    template <typename ParameterT>
+    ConfigError getError(const ParameterT& pActual) const{
+      return ConfigError("");
+    }
+  };
+  
+  template <typename Name, typename ValidatorT>
+  struct FunctorConstraint<Name, ValidatorT>{
+    typedef ValidatorT validator_type;
+    validator_type mValidator;
+    
+    template <typename CallableT>
+    FunctorConstraint(CallableT&& pCallable)
+    : mValidator(pCallable){}
+    
+    template <typename ParameterT>
+    bool validate(const ParameterT& pActual) const{
+      return mValidator(pActual);
+    }
+    
+    template <typename ParameterT>
+    ConfigError getError(const ParameterT& pActual) const{
+      return ConfigError("Constraint validation \""+Name().getString()+"\" failed.");
+    }
+  };
+  
   namespace internal{
-    template<size_t ...>
-    struct integer_sequence { };
-
-    template<int N, size_t ...S>
-    struct gens : gens<N-1, N-1, S...> { };
-
-    template<size_t ...S>
-    struct gens<0, S...> {
-      typedef integer_sequence<S...> type;
-    };
-
+    
     template <typename... Params>
-    using index_sequence_for = typename gens<sizeof...(Params)>::type;
+    struct RemoveSettingName{
+      
+      template <typename... FParams>
+      static auto proceed(FParams...) -> std::tuple<>{
+        return std::tuple<>();
+      }
+    };
+    
+    template <typename FirstParam, typename... Params>
+    struct RemoveSettingName<FirstParam, Params...>{
+      static auto proceed(FirstParam fp, Params... params) -> decltype(std::tuple_cat(std::make_tuple(fp), RemoveSettingName<Params...>::proceed(params...))){
+        return std::tuple_cat(std::make_tuple(fp), RemoveSettingName<Params...>::proceed(params...));
+      }
+    };
+    
+    template <uint64_t Q1, uint64_t Q2, uint64_t Q3, uint64_t Q4, typename... Params>
+    struct RemoveSettingName<settingName<Q1,Q2,Q3,Q4>, Params...>{
+      static auto proceed(settingName<Q1,Q2,Q3,Q4>, Params... params) -> decltype(RemoveSettingName<Params...>::proceed(params...)){
+        return RemoveSettingName<Params...>::proceed(params...);
+      }
+    };
+    
+    // template <>
+    // struct RemoveSettingName<>{
+      // static auto proceed() -> std::tuple<>{
+        // return std::tuple<>();
+      // }
+    // };
+      
+    template <typename ConstraintName, typename... Params, size_t... Idx>
+    auto build_FunctorConstraint(ConstraintName, std::tuple<Params...> params, integer_sequence<Idx...>) -> FunctorConstraint<ConstraintName, Params...>{
+      return FunctorConstraint<ConstraintName, Params...>(std::get<Idx>(params)...);
+    }
+    
+    template <typename... Params>
+    auto make_FunctorConstraint(Params... params) -> decltype(build_FunctorConstraint(typename ExtractSettingName<Params...>::result(), RemoveSettingName<Params...>::proceed(params...), index_sequence_size<std::tuple_size<decltype(RemoveSettingName<Params...>::proceed(params...))>::value>{})){
+      return build_FunctorConstraint(typename ExtractSettingName<Params...>::result(), RemoveSettingName<Params...>::proceed(params...), index_sequence_size<std::tuple_size<decltype(RemoveSettingName<Params...>::proceed(params...))>::value>{});
+    }
+  
+  }
+  
     
 /*****************************************************
     MakeSettingDefDynParametersTuple : create the
@@ -449,7 +545,7 @@ namespace icfg{
     for containing dynamically-parameterized
     elements (like constraints)
 ******************************************************/
-
+  namespace internal{
     template <typename T>
     struct IsSettingDefDynParameter;
 
@@ -489,6 +585,13 @@ namespace icfg{
     struct IsSettingDefDynParameter<LengthConstraint<T>>{
       static auto extract(const LengthConstraint<T>& param) -> std::tuple<LengthConstraint<T>>{
         return std::tuple<LengthConstraint<T>>(param);
+      }
+    };
+    
+    template <uint64_t Q1, uint64_t Q2, uint64_t Q3, uint64_t Q4, typename CallableT>
+    struct IsSettingDefDynParameter<FunctorConstraint<settingName<Q1,Q2,Q3,Q4>, CallableT>>{
+      static auto extract(const FunctorConstraint<settingName<Q1,Q2,Q3,Q4>, CallableT>& param) -> std::tuple<FunctorConstraint<settingName<Q1,Q2,Q3,Q4>, CallableT>>{
+        return std::tuple<FunctorConstraint<settingName<Q1,Q2,Q3,Q4>, CallableT>>(param);
       }
     };
 
@@ -927,6 +1030,10 @@ namespace icfg{
     #define CHECK_ALLOWED_UNROLL_PARAM_15(PARAMS, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15) \
       CHECK_ALLOWED_UNROLL_PARAM_7(PARAMS, P1, P2, P3, P4, P5, P12, P13 ), \
       CHECK_ALLOWED_UNROLL_PARAM_8(PARAMS, P6, P7, P8, P9, P10, P11, P14, P15 )
+      
+    #define CHECK_ALLOWED_UNROLL_PARAM_16(PARAMS, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15, P16) \
+      CHECK_ALLOWED_UNROLL_PARAM_8(PARAMS, P1, P2, P3, P4, P5, P12, P13, P16 ), \
+      CHECK_ALLOWED_UNROLL_PARAM_8(PARAMS, P6, P7, P8, P9, P10, P11, P14, P15 )
 
     #define CALL_CHECK_ALLOWED_UNROLL_PARAM(MACRO, PARAMS) MACRO PARAMS
       
@@ -943,6 +1050,59 @@ namespace icfg{
       static_assert( \
       decltype(internal::is_one_or_instance_of<REQUIRED>(std::declval<typename std::tuple_element<N,std::tuple<PARAMS...>>::type>()))::value, \
       "parameter "#N" to "#CONTEXT" should be "#REQUIRED)
+      
+    template <typename T>
+    struct is_functor_constraint : public std::false_type{
+    };
+    
+    template <typename CallableT, typename Name>
+    struct is_functor_constraint<FunctorConstraint<CallableT, Name>> : public std::true_type{
+    };
+    
+    template <class CallableType, typename... PTypes>
+    struct is_callable_with{
+      typedef char yes[1];
+      typedef char no[2];
+
+      template <typename CType>
+      static yes& test(decltype(std::declval<CType>()(std::declval<PTypes>()...))*);
+
+      template <typename>
+      static no& test(...);
+
+      static const bool value = sizeof(test<CallableType>(0)) == sizeof(yes);
+    };
+    
+    template <typename ConstraintT, typename result_type>
+    struct constraint_matches_result{
+      
+      typedef char yes[1];
+      typedef char no[2];
+
+      template <typename CType>
+      static yes& test(decltype(std::declval<CType>().mValidator(std::declval<result_type>()))*);
+
+      template <typename>
+      static no& test(...);
+
+      static const bool value = sizeof(test<ConstraintT>(0)) == sizeof(yes);
+    };
+    
+    template <typename T>
+    struct is_functor{
+      
+      typedef char yes[1];
+      typedef char no[2];
+
+      template <typename CType>
+      static yes& test(decltype(&CType::operator()));
+
+      template <typename>
+      static no& test(...);
+
+      static const bool value = sizeof(test<T>(0)) == sizeof(yes);
+    };
+    
   }
   
 /*****************************************************
@@ -976,7 +1136,7 @@ namespace icfg{
     CHECK_FORBIDDEN(setting, setting, settingDef, Params);
     CHECK_FORBIDDEN(setting, section, sectionDef, Params);
     
-    CHECK_ALLOWED( 15, setting, Params, settingName, listTag, stringTag, LengthConstraint, booleanTag, int8Tag, uint8Tag, int16Tag, uint16Tag, int32Tag, uint32Tag, int64Tag, uint64Tag, floatTag, doubleTag);
+    CHECK_ALLOWED( 16, setting, Params, settingName, listTag, stringTag, LengthConstraint, FunctorConstraint, booleanTag, int8Tag, uint8Tag, int16Tag, uint16Tag, int32Tag, uint32Tag, int64Tag, uint64Tag, floatTag, doubleTag);
     
     CHECK_REQUIRED(setting, settingName, settingName, Params);
     CHECK_UNIQUE(setting, settingName, settingName, Params);
@@ -1038,6 +1198,16 @@ namespace icfg{
     );
     
     #undef ICFG_IS
+    
+    //check FunctorConstraint's validity
+    static_assert(
+    internal::all_true<
+      internal::one_true<
+        !internal::is_functor_constraint<Params>::value,
+        internal::is_functor_constraint<Params>::value && constraint_matches_result<Params, typename internal::settingDef<Params...>::result_type::myType>::value
+      >::value...
+    >::value,
+    "constraint input parameter doesn't match the setting's result type");
     
     return internal::settingDef<Params...>(std::tuple_cat(internal::tuplifyOne(params)...));
   }
@@ -1115,7 +1285,31 @@ namespace icfg{
   auto include(const FTorT&& functor) -> decltype(functor().content){
     return functor().content;
   }
+  
+  template <typename... Params>
+  auto check(Params&&... params) -> decltype(internal::make_FunctorConstraint(std::forward<Params>(params)...)){
+    
+    using namespace internal;
+    CHECK_FORBIDDEN(check, setting, settingDef, Params);
+    CHECK_FORBIDDEN(check, section, sectionDef, Params);
+    CHECK_FORBIDDEN(check, switchOn, switchDef, Params);
+    CHECK_FORBIDDEN(check, caseOf, switchDef, Params);
+    CHECK_FORBIDDEN(check, map, mapDef, Params);
+    CHECK_FORBIDDEN(check, list, listTag, Params);
+    CHECK_FORBIDDEN(check, string, stringTag, Params);
+    CHECK_FORBIDDEN(check, config, configDef, Params);
+    CHECK_FORBIDDEN(check, length constraint, LengthConstraint, Params);
+    
+    CHECK_REQUIRED(check, settingName, settingName, Params);
+    CHECK_UNIQUE(check, settingName, settingName, Params);
+    CHECK_NTH(0, check, settingName, Params);
 
+    //check functor in params
+    static_assert(internal::one_true<internal::is_functor<Params>::value...>::value, "missing required functor parameter in check function");
+    
+    return internal::make_FunctorConstraint(std::forward<Params>(params)...);
+  }
+  
 /*****************************************************
     Tuplify : wraps all arguments into tuple if not
     already a tuple
@@ -1505,6 +1699,16 @@ namespace icfg{
       }
       static ConfigError getError(const LengthConstraint<T>& constraint, const std::string& result){
         return constraint.getError(result.size());
+      }
+    };
+    
+    template <uint64_t Q1, uint64_t Q2, uint64_t Q3, uint64_t Q4, typename CallableT, typename ResultType>
+    struct ApplyConstraintCheck<FunctorConstraint<settingName<Q1,Q2,Q3,Q4>, CallableT>, ResultType>{
+      static bool validate(const FunctorConstraint<settingName<Q1,Q2,Q3,Q4>, CallableT>& constraint, const ResultType& result){
+        return constraint.validate(result);
+      }
+      static ConfigError getError(const FunctorConstraint<settingName<Q1,Q2,Q3,Q4>, CallableT>& constraint, const ResultType& result){
+        return constraint.getError(result);
       }
     };
    

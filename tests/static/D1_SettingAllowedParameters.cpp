@@ -5,7 +5,7 @@ using namespace icfg;
 auto settingString = 
 config(
   setting(
-    STG_NAME("mySetting"),
+    ICFG_STR("mySetting"),
     string,
     length>5
   )
@@ -14,7 +14,7 @@ config(
 auto settingList = 
 config(
   setting(
-    STG_NAME("mySetting"),
+    ICFG_STR("mySetting"),
     list(string),
     length>5
   )

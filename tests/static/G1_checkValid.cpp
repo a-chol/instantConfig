@@ -2,14 +2,10 @@
 
 using namespace icfg;
 
-auto includeCfg = config();
-
 auto settingString = 
 config(
   setting(
-    ICFG_STR("mySetting"),
-    string,
-    include(includeCfg)
+    ICFG_STR("setting"), string, check(ICFG_STR("constraint"), [](const std::string& str){return true;})
   )
 );
 

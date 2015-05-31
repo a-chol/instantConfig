@@ -4,7 +4,7 @@ using namespace icfg;
 
 auto settingString = 
 config(
-  caseOf(STG_NAME("caseOne"))
+  caseOf(ICFG_STR("caseOne"))
 );
 
 int main(){

@@ -5,10 +5,10 @@ using namespace icfg;
 auto settingString = 
 config(
   switchOn(
-    STG_NAME("switchValue"),
+    ICFG_STR("switchValue"),
     caseOf(
-      STG_NAME("caseOne"),
-      STG_NAME("caseTwo")
+      ICFG_STR("caseOne"),
+      ICFG_STR("caseTwo")
     )
   )
 );
