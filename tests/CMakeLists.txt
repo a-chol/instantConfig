@@ -23,7 +23,13 @@ include_directories(
   ${CMAKE_BINARY_DIR}
 )
 
-add_executable(icfg-test build_test_runner.cpp compile_test_suite.cpp runtime_test_suite.cpp)
+if (WIN32 OR MSYS OR MINGW)
+  set(compiler_output_test_file "CompilerOutputTest_win.cpp")
+else()
+  set(compiler_output_test_file "CompilerOutputTest_unix.cpp")
+endif (WIN32 OR MSYS OR MINGW)
+
+add_executable(icfg-test build_test_runner.cpp compile_test_suite.cpp runtime_test_suite.cpp ${compiler_output_test_file})
 
 if (UNIX)
   set(ADDITIONAL_LIBS "stdc++" "pthread")

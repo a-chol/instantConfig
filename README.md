@@ -22,6 +22,7 @@ Let's suppose that I want to get from a configuration file a string setting "App
 I can create my confirguration description in the following way:
 
 ```cpp
+using namespace icfg;
 auto myConfigDef = 
 config(
   setting(ICFG_STR("ApplicationName"), string),
@@ -272,7 +273,7 @@ An example of such a valid configuration file, using json format, looks like thi
 Given the complexity of the template metaprogramming that take place under the hood, mistakes in the configuration definition can lead to very harsh compilation errors. In order to avoid panick attacks in such cases, I tried to harness public functions with a solid harness of static error checking with descriptive error messages.
 
 ## Compiler compatibility
-The whole set of static unit tests has been run and validated against g++ 4.7.2 and Visual Studio 2015 RC on Windows. If you can contribute by running the test with other compilers on other OSes, it will be greatly appreciated.
+The whole set of static unit tests has been run and validated against g++ 4.7.2 and Visual Studio 2015 RC on Windows, as well as g++ 4.8.1 and clang 3.5 on Ubuntu 12.04. If you can contribute by running the test with other compilers on other OSes, it will be greatly appreciated.
 
 ## Available loaders
 Available loaders can be found in the *loaders* subdirectory.

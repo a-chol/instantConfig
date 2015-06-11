@@ -1,5 +1,7 @@
 
 
-const char* TestProjectLocation = "${TestProjectLocation}"; 
+static const char* TestProjectLocation = "${TestProjectLocation}"; 
+
+static const char* CmakeExecutable = "${CMAKE_COMMAND}"; 
 
 

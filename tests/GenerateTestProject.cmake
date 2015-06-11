@@ -11,7 +11,7 @@ set(CurrentGenerator ${CMAKE_GENERATOR})
 
 message("executing test_static generation : cmake -G\"${CurrentGenerator}\" ${CMAKE_CURRENT_SOURCE_DIR}/static")
 
-file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/tests_static")
+file(MAKE_DIRECTORY ${TestProjectLocation})
 
 execute_process(
   COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" -DCMAKE_CXX_FLAGS=-std=c++11 ${CMAKE_CURRENT_SOURCE_DIR}/static
