@@ -14,6 +14,7 @@ Through the use of a Domain Specific Language to describe the expected content o
  * Check for errors if any, and display them.
  * Directly address the statically-typed settings from the loading step result. No need for a cast of any kind, it's all ready to use as you expect.
  
+  > All along the following examples, you will see notations such as `ICFG_STR("some string")`. This is a macro that defines a static type based on the given string. The implementation imposes a limitation of a maximum of 32 characters for the identifiers that you can use.
 
 # Example
 Let's suppose that I want to get from a configuration file a string setting named "ApplicationName" and a list of strings named "Modules". 
