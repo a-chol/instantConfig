@@ -287,7 +287,10 @@ Use the following commands:
 ## Available loaders
 Available loaders can be found in the *loaders* subdirectory.
 
-For now, only the json loader using *json-cpp* has been implemented.
-Implementing a loader using another library is really easy and contributions are welcome.
+Currently proposed loaders are using: 
+ * jsoncpp : a simple json loader
+ * jsoncons : a header-only json library, which makes loading a json configuration with instantConfig totally header-only
+
+Implementing a loader using another library is really easy and contributions are welcome. A guide is available in the loaders directory.
 
 
